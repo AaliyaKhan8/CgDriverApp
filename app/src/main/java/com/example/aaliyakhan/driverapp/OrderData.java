@@ -5,23 +5,19 @@ package com.example.aaliyakhan.driverapp;
  */
 
 public class OrderData {
-   private String customername,from,to;
+   private String customername,to;
 
     public String getCustomername() {
         return customername;
     }
 
-    public String getFrom() {
-        return from;
-    }
 
     public String getTo() {
         return to;
     }
 
-    public OrderData(String customername, String from, String to) {
+    public OrderData(String customername, String to) {
         this.customername = customername;
-        this.from = from;
         this.to = to;
     }
 

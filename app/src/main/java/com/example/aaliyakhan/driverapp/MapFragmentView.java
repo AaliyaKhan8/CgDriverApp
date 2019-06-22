@@ -19,16 +19,22 @@ package com.example.aaliyakhan.driverapp;
 import java.io.File;
 import java.lang.ref.WeakReference;
 import java.util.List;
+import java.util.Locale;
 
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 import com.here.android.mpa.common.GeoBoundingBox;
 import com.here.android.mpa.common.GeoCoordinate;
 import com.here.android.mpa.common.GeoPosition;
 import com.here.android.mpa.common.OnEngineInitListener;
+import com.here.android.mpa.common.PositioningManager;
 import com.here.android.mpa.guidance.NavigationManager;
+import com.here.android.mpa.guidance.VoicePackage;
 import com.here.android.mpa.mapping.Map;
 import com.here.android.mpa.mapping.SupportMapFragment;
 import com.here.android.mpa.mapping.MapRoute;
 import com.here.android.mpa.routing.CoreRouter;
+import com.here.android.mpa.routing.Maneuver;
 import com.here.android.mpa.routing.Route;
 import com.here.android.mpa.routing.RouteOptions;
 import com.here.android.mpa.routing.RoutePlan;
@@ -36,6 +42,8 @@ import com.here.android.mpa.routing.RouteResult;
 import com.here.android.mpa.routing.RouteWaypoint;
 import com.here.android.mpa.routing.Router;
 import com.here.android.mpa.routing.RoutingError;
+
+import android.speech.tts.TextToSpeech;
 import android.support.v7.app.AppCompatActivity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
@@ -47,6 +55,7 @@ import android.os.Environment;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
 
 public class MapFragmentView {
@@ -56,13 +65,26 @@ public class MapFragmentView {
     private Map m_map;
     private NavigationManager m_navigationManager;
     private GeoBoundingBox m_geoBoundingBox;
+    PositioningManager positioningManager;
     private Route m_route;
     private boolean m_foregroundServiceStarted;
     String position;
+    String turnside="";
+    TextToSpeech t1;
+
     public MapFragmentView(AppCompatActivity activity,String position) {
         m_activity = activity;
         this.position=position;
         initMapFragment();
+
+        t1=new TextToSpeech(m_activity, new TextToSpeech.OnInitListener() {
+            @Override
+            public void onInit(int status) {
+                if(status != TextToSpeech.ERROR) {
+                    t1.setLanguage(Locale.UK);
+                }
+            }
+        });
     }
 
     private SupportMapFragment getMapFragment() {
@@ -70,7 +92,6 @@ public class MapFragmentView {
     }
 
     private void initMapFragment() {
-        /* Locate the mapFragment UI element */
         m_mapFragment = getMapFragment();
 
         // Set path of isolated disk cache
@@ -88,30 +109,25 @@ public class MapFragmentView {
 
         boolean success = com.here.android.mpa.common.MapSettings.setIsolatedDiskCacheRootPath(diskCacheRoot, "intent");
         if (!success) {
-            // Setting the isolated disk cache was not successful, please check if the path is valid and
-            // ensure that it does not match the default location
-            // (getExternalStorageDirectory()/.here-maps).
-            // Also, ensure the provided intent name does not match the default intent name.
         } else {
             if (m_mapFragment != null) {
-            /* Initialize the SupportMapFragment, results will be given via the called back. */
                 m_mapFragment.init(new OnEngineInitListener() {
                     @Override
                     public void onEngineInitializationCompleted(OnEngineInitListener.Error error) {
 
                         if (error == Error.NONE) {
                             m_map = m_mapFragment.getMap();
-                            m_map.setCenter(new GeoCoordinate(13.082680, 80.270721),
-                                    Map.Animation.NONE);
-                            //Put this call in Map.onTransformListener if the animation(Linear/Bow)
-                            //is used in setCenter()
+//                            m_map.setCenter(new GeoCoordinate(11.127123, 78.656891),
+//                                    Map.Animation.LINEAR);
+                            positioningManager=PositioningManager.getInstance();
                             m_map.setZoomLevel(13.2);
-                        /*
-                         * Get the NavigationManager instance.It is responsible for providing voice
-                         * and visual instructions while driving and walking
-                         */
                             m_navigationManager = NavigationManager.getInstance();
-                            initNaviControlButton();
+                            if (positioningManager!=null){
+                                positioningManager.start(PositioningManager.LocationMethod.GPS_NETWORK);
+                            }
+                            positioningManager.addListener(
+                                    new WeakReference<PositioningManager.OnPositionChangedListener>(positionListener));                            initNaviControlButton();
+
                             m_map.getPositionIndicator().setVisible(true);
                         } else {
                             Toast.makeText(m_activity,
@@ -131,32 +147,28 @@ public class MapFragmentView {
 
         /* Initialize a RoutePlan */
         RoutePlan routePlan = new RoutePlan();
-        double startlat=0,startlong=0,destlat=0,destlong=0;
-        if(position.equals("0"))
+        double startlat=19.1236301,startlong=73.0181221,destlat=0,destlong=0;
+        if("0".equals("0"))
         {
-            startlat=12.922915;
-            startlong=80.127457;
-            destlat=12.997668;
-            destlong=80.097198;
+
+            destlat=19.162222;
+            destlong=72.997889;
 
         }
         else if(position.equals("1")){
-            startlat=13.072090;
-            startlong=80.201859;
-            destlat=12.904759;
-            destlong=80.089081;
+
+            destlat=19.177958;
+            destlong=73.023068;
         }
         else if(position.equals("2")){
-            startlat=13.052570;
-            startlong=80.211533;
-            destlat=13.048370;
-            destlong=80.245480;
+
+            destlat=19.224572;
+            destlong=72.976742;
         }
         else if(position.equals("3")){
-            startlat=12.869560;
-            startlong=80.167750;
-            destlat=12.925090;
-            destlong=80.100868;
+
+            destlat=19.050011;
+            destlong=73.027006;
         }
         /*
          * Initialize a RouteOption.HERE SDK allow users to define their own parameters for the
@@ -205,18 +217,13 @@ public class MapFragmentView {
                                 /* Create a MapRoute so that it can be placed on the map */
                                 MapRoute mapRoute = new MapRoute(routeResults.get(0).getRoute());
 
-                                /* Show the maneuver number on top of the route */
                                 mapRoute.setManeuverNumberVisible(true);
 
-                                /* Add the MapRoute to the map */
                                 m_map.addMapObject(mapRoute);
+                                m_map.getPositionIndicator().setVisible(true);
 
-                                /*
-                                 * We may also want to make sure the map view is orientated properly
-                                 * so the entire route can be easily seen.
-                                 */
                                 m_geoBoundingBox = routeResults.get(0).getRoute().getBoundingBox();
-                                m_map.zoomTo(m_geoBoundingBox, Map.Animation.NONE,
+                                m_map.zoomTo(m_geoBoundingBox, Map.Animation.LINEAR,
                                         Map.MOVE_PRESERVE_ORIENTATION);
 
                                 startNavigation();
@@ -260,7 +267,7 @@ public class MapFragmentView {
                     /*
                      * Restore the map orientation to show entire route on screen
                      */
-                    m_map.zoomTo(m_geoBoundingBox, Map.Animation.NONE, 0f);
+                    m_map.zoomTo(m_geoBoundingBox, Map.Animation.LINEAR, 0f);
                     m_naviControlButton.setText("Start");
                     m_route = null;
                 }
@@ -275,6 +282,29 @@ public class MapFragmentView {
      * In order to retrieve location updates more frequently start a foreground service.
      * See https://developer.android.com/guide/components/services.html#Foreground
      */
+
+
+
+
+    private PositioningManager.OnPositionChangedListener positionListener = new
+            PositioningManager.OnPositionChangedListener() {
+
+                public void onPositionUpdated(PositioningManager.LocationMethod method,
+                                              GeoPosition position, boolean isMapMatched) {
+                    // set the center only when the app is in the foreground
+                    // to reduce CPU consumption
+                    m_map.setCenter(position.getCoordinate(),
+                            Map.Animation.BOW);
+
+
+                }
+
+
+                public void onPositionFixChanged(PositioningManager.LocationMethod method,
+                                                 PositioningManager.LocationStatus status) {
+                }
+            };
+
     private void startForegroundService() {
         if (!m_foregroundServiceStarted) {
             m_foregroundServiceStarted = true;
@@ -318,7 +348,7 @@ public class MapFragmentView {
         });
         alertDialogBuilder.setPositiveButton("Simulation",new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialoginterface, int i) {
-                m_navigationManager.simulate(m_route,100);//Simualtion speed is set to 60 m/s
+                m_navigationManager.simulate(m_route,40);//Simualtion speed is set to 60 m/s
                 m_map.setTilt(60);
                 startForegroundService();
             };
@@ -341,27 +371,22 @@ public class MapFragmentView {
         addNavigationListeners();
     }
 
-    private void addNavigationListeners() {
-
-        /*
-         * Register a NavigationManagerEventListener to monitor the status change on
-         * NavigationManager
-         */
-        m_navigationManager.addNavigationManagerEventListener(
-                new WeakReference<NavigationManager.NavigationManagerEventListener>(
-                        m_navigationManagerEventListener));
-
-        /* Register a PositionListener to monitor the position updates */
-        m_navigationManager.addPositionListener(
-                new WeakReference<NavigationManager.PositionListener>(m_positionListener));
-    }
-
-    private NavigationManager.PositionListener m_positionListener = new NavigationManager.PositionListener() {
-        @Override
-        public void onPositionUpdated(GeoPosition geoPosition) {
-            /* Current position information can be retrieved in this callback */
-        }
-    };
+//    private void addNavigationListeners() {
+//
+//        /*
+//         * Register a NavigationManagerEventListener to monitor the status change on
+//         * NavigationManager
+//         */
+//
+//        m_navigationManager.addNewInstructionEventListener(new WeakReference<NavigationManager.NewInstructionEventListener>(instlistener));
+//
+//        m_navigationManager.addNavigationManagerEventListener(
+//                new WeakReference<NavigationManager.NavigationManagerEventListener>(
+//                        m_navigationManagerEventListener));
+//
+//        /* Register a PositionListener to monitor the position updates */
+//
+//    }
 
     private NavigationManager.NavigationManagerEventListener m_navigationManagerEventListener = new NavigationManager.NavigationManagerEventListener() {
         @Override
@@ -405,4 +430,78 @@ public class MapFragmentView {
             m_navigationManager.stop();
         }
     }
+
+// declare the listeners
+// add application specific logic in each of the callbacks.
+
+    private NavigationManager.NewInstructionEventListener instructListener
+            = new NavigationManager.NewInstructionEventListener() {
+
+        @Override
+        public void onNewInstructionEvent() {
+            // Interpret and present the Maneuver object as it contains
+            // turn by turn navigation instructions for the user.
+            m_navigationManager.getNextManeuver();
+        }
+    };
+
+    private NavigationManager.PositionListener m_positionListener = new NavigationManager.PositionListener() {
+        @Override
+        public void onPositionUpdated(GeoPosition position) {
+            /* Current position information can be retrieved in this callback */
+            FirebaseDatabase database = FirebaseDatabase.getInstance();
+            DatabaseReference myRef = database.getReference("message");
+
+            myRef.child("latitude").setValue(position.getCoordinate().getLatitude() + "");
+            myRef.child("longitude").setValue(position.getCoordinate().getLongitude());
+        }
+    };
+    NavigationManager.NewInstructionEventListener instlistener = new NavigationManager.NewInstructionEventListener() {
+        @Override
+        public void onNewInstructionEvent() {
+            super.onNewInstructionEvent();
+            Maneuver maneuver= m_navigationManager.getNextManeuver();
+
+            Maneuver.Turn turn = maneuver.getTurn();
+            String turnName=turn.name();
+            int distance = maneuver.getDistanceFromPreviousManeuver();
+            String nextRoadName = maneuver.getNextRoadName();
+ //           instructionText.setText("Take a "+turnName+"to the "+nextRoadName+" in "+distance+"mts");
+            Log.e("ins",nextRoadName);
+   //         instructionText.setText("Will take a "+turnName+"to the "+nextRoadName+" in "+distance+"mts");
+
+            if(turnName.contains("QUITE_")){
+                turnside=turnName.replace("QUITE_","");
+            }
+            String a="Take a "+turnside+" to the "+nextRoadName+" in "+distance+"meters";
+            TextView textView=m_activity.findViewById(R.id.instructions);
+            textView.setText(a);
+
+            Log.e( "onNewInstructionEvent: ", a);
+            t1.speak(a, TextToSpeech.QUEUE_FLUSH, null);
+//
+//            ImageView img=m_activity.findViewById(R.id.imgview);
+//            if (turnName.toLowerCase().contains("right"))
+//                img.setImageResource(R.drawable.rightturn);
+//            else
+//                img.setImageResource(R.drawable.leftturn);
+
+        }
+    };
+    private void addNavigationListeners() {
+        /*
+         * Register a NavigationManagerEventListener to monitor the status change on
+         * NavigationManager
+         */
+        m_navigationManager.addNewInstructionEventListener(new WeakReference<NavigationManager.NewInstructionEventListener>(instlistener));
+
+        m_navigationManager.addNavigationManagerEventListener(
+                new WeakReference<NavigationManager.NavigationManagerEventListener>(
+                        m_navigationManagerEventListener));
+
+        /* Register a PositionListener to monitor the position updates */
+        m_navigationManager.addPositionListener(
+                new WeakReference<NavigationManager.PositionListener>(m_positionListener));
+    }
+
 }

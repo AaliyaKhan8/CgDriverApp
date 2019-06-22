@@ -24,13 +24,10 @@ import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.widget.Toast;
-
-/**
- * Main activity which launches map view and handles Android run-time requesting permission.
- */
 public class MainActivity extends AppCompatActivity {
-    String position;
+    String fromaddress,toaddress,position;
     private final static int REQUEST_CODE_ASK_PERMISSIONS = 1;
     private static final String[] RUNTIME_PERMISSIONS = {
             Manifest.permission.ACCESS_FINE_LOCATION,
@@ -46,7 +43,13 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        setTitle("Map");
+//        fromaddress=getIntent().getExtras().getString("fromaddress");
         position=getIntent().getExtras().getString("pos");
+        Log.e( "onCreate: ",position+"POS" );
+        toaddress=getIntent().getExtras().getString("toaddress");
+        Log.e( "onCreate: ","to"+toaddress );
+       // Toast.makeText(this, "from"+fromaddress+"to"+toaddress, Toast.LENGTH_SHORT).show();
         if (hasPermissions(this, RUNTIME_PERMISSIONS)) {
             setupMapFragmentView();
         } else {
